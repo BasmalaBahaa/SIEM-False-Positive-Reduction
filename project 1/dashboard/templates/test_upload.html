@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+
+{% block title %}Test Upload - SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2 class="mb-0">
+            <i class="fas fa-upload me-2"></i>Test Data Upload
+        </h2>
+        <p class="text-muted">Upload CSV files for anomaly detection testing</p>
+    </div>
+</div>
+
+<!-- Upload Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-file-csv me-2"></i>Upload Test Data
+            </div>
+            <div class="card-body">
+                <!-- Prominent Upload Button -->
+                <div class="text-center mb-4">
+                    <input type="file" id="fileInput" accept=".csv,.raw" style="display: none;">
+                    <button class="btn btn-success btn-lg" onclick="document.getElementById('fileInput').click()">
+                        <i class="fas fa-upload me-2"></i>Upload File (CSV/RAW)
+                    </button>
+                    <p class="text-muted mt-2">Click to browse or drag & drop below</p>
+                </div>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <i class="fas fa-cloud-upload-alt fa-4x mb-3 text-primary"></i>
+                        <h4>Drag & Drop CSV or RAW File Here</h4>
+                        <p class="text-muted">or click the upload button above</p>
+                    </div>
+                </div>
+                
+                <div id="uploadProgress" class="mt-3" style="display: none;">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 100%">
+                            Uploading...
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="uploadError" class="alert alert-danger mt-3" style="display: none;"></div>
+                <div id="uploadSuccess" class="alert alert-success mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section (Hidden by default) -->
+<div id="resultsSection" style="display: none;">
+    <!-- Detection Results -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card" id="detectionCard">
+                <div class="card-header" id="detectionHeader">
+                    <i class="fas fa-shield-alt me-2"></i>Detection Results
+                </div>
+                <div class="card-body" id="detectionBody">
+                    <!-- Detection results will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar me-2"></i>Upload Results
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="card kpi-card border-primary">
+                                <div class="kpi-icon text-primary">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <div class="kpi-value text-primary" id="totalRecords">0</div>
+                                <div class="kpi-label">Total Records</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card kpi-card border-info">
+                                <div class="kpi-icon text-info">
+                                    <i class="fas fa-columns"></i>
+                                </div>
+                                <div class="kpi-value text-info" id="totalColumns">0</div>
+                                <div class="kpi-label">Columns</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card kpi-card border-success">
+                                <div class="kpi-icon text-success">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="kpi-value text-success" id="uploadStatus">Ready</div>
+                                <div class="kpi-label">Status</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- File Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i>File Information
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Filename:</strong> <span id="filename">-</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Upload Time:</strong> <span id="uploadTime">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columns List -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-list me-2"></i>Data Columns
+                </div>
+                <div class="card-body">
+                    <div id="columnsList" class="d-flex flex-wrap gap-2">
+                        <span class="text-muted">No columns loaded yet</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Data Preview -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-table me-2"></i>Data Preview (First 5 Rows)
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover" id="previewTable">
+                            <thead>
+                                <tr id="previewHeader">
+                                    <th class="text-muted">No data loaded</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewBody">
+                                <tr>
+                                    <td class="text-muted">Upload a CSV file to see preview</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .upload-area {
+        border: 2px dashed #6c757d;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background-color: rgba(108, 117, 125, 0.1);
+    }
+    
+    .upload-area:hover {
+        border-color: #0d6efd;
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+    
+    .upload-area.dragover {
+        border-color: #0d6efd;
+        background-color: rgba(13, 110, 253, 0.2);
+    }
+    
+    .upload-content {
+        pointer-events: none;
+    }
+    
+    .column-badge {
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        background-color: #0d6efd;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadError = document.getElementById('uploadError');
+    const uploadSuccess = document.getElementById('uploadSuccess');
+    const resultsSection = document.getElementById('resultsSection');
+    
+    // Drag and drop handlers
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+    
+    // File input change handler
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+    
+    // Handle file upload
+    function handleFile(file) {
+        if (!file.name.endsWith('.csv') && !file.name.endsWith('.raw')) {
+            showError('Only CSV and RAW files are supported');
+            return;
+        }
+        
+        // Show progress
+        uploadProgress.style.display = 'block';
+        uploadError.style.display = 'none';
+        uploadSuccess.style.display = 'none';
+        
+        // Create FormData
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Upload file
+        fetch('/api/upload-test', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+            
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+            
+            return response.text().then(text => {
+                console.log('Response text:', text);
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    throw new Error('Invalid JSON response from server');
+                }
+            });
+        })
+        .then(data => {
+            uploadProgress.style.display = 'none';
+            console.log('Parsed data:', data);
+            
+            if (!data) {
+                showError('No response data received from server');
+                return;
+            }
+            
+            if (data.success) {
+                showSuccess(data.message);
+                displayResults(data);
+            } else {
+                showError(data.error || 'Upload failed');
+            }
+        })
+        .catch(error => {
+            uploadProgress.style.display = 'none';
+            console.error('Upload error:', error);
+            showError('Error uploading file: ' + error.message);
+        });
+    }
+    
+    // Show error message
+    function showError(message) {
+        uploadError.textContent = message;
+        uploadError.style.display = 'block';
+        uploadSuccess.style.display = 'none';
+    }
+    
+    // Show success message
+    function showSuccess(message) {
+        uploadSuccess.textContent = message;
+        uploadSuccess.style.display = 'block';
+        uploadError.style.display = 'none';
+    }
+    
+    // Display upload results
+    function displayResults(data) {
+        resultsSection.style.display = 'block';
+        
+        // Display detection results
+        displayDetectionResults(data.detection);
+        
+        // Handle RAW files differently
+        if (data.file_type === 'raw') {
+            document.getElementById('totalRecords').textContent = 'N/A';
+            document.getElementById('totalColumns').textContent = 'N/A';
+            document.getElementById('uploadStatus').textContent = 'RAW';
+            
+            // Update file info
+            document.getElementById('filename').textContent = data.filename;
+            document.getElementById('uploadTime').textContent = new Date().toLocaleString();
+            
+            // Hide columns list and preview for RAW files
+            document.getElementById('columnsList').innerHTML = '<span class="text-muted">RAW file - no columns</span>';
+            
+            const previewHeader = document.getElementById('previewHeader');
+            const previewBody = document.getElementById('previewBody');
+            previewHeader.innerHTML = '<th>File Information</th>';
+            previewBody.innerHTML = `
+                <tr>
+                    <td>
+                        <strong>File Type:</strong> RAW<br>
+                        <strong>File Size:</strong> ${data.file_size} bytes<br>
+                        <strong>Status:</strong> Logged for manual analysis
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Handle CSV files
+        // Update KPI cards
+        document.getElementById('totalRecords').textContent = data.total_records;
+        document.getElementById('totalColumns').textContent = data.columns.length;
+        document.getElementById('uploadStatus').textContent = 'Success';
+        
+        // Update file info
+        document.getElementById('filename').textContent = data.filename;
+        document.getElementById('uploadTime').textContent = new Date().toLocaleString();
+        
+        // Update columns list
+        const columnsList = document.getElementById('columnsList');
+        columnsList.innerHTML = '';
+        data.columns.forEach(column => {
+            const badge = document.createElement('span');
+            badge.className = 'column-badge';
+            badge.textContent = column;
+            columnsList.appendChild(badge);
+        });
+        
+        // Update preview table
+        const previewHeader = document.getElementById('previewHeader');
+        const previewBody = document.getElementById('previewBody');
+        
+        // Clear existing content
+        previewHeader.innerHTML = '';
+        previewBody.innerHTML = '';
+        
+        if (data.preview && data.preview.length > 0) {
+            // Add header row
+            data.columns.forEach(column => {
+                const th = document.createElement('th');
+                th.textContent = column;
+                previewHeader.appendChild(th);
+            });
+            
+            // Add data rows
+            data.preview.forEach(row => {
+                const tr = document.createElement('tr');
+                data.columns.forEach(column => {
+                    const td = document.createElement('td');
+                    td.textContent = row[column] !== undefined ? row[column] : '-';
+                    tr.appendChild(td);
+                });
+                previewBody.appendChild(tr);
+            });
+        }
+    }
+    
+    // Display detection results
+    function displayDetectionResults(detection) {
+        const detectionCard = document.getElementById('detectionCard');
+        const detectionHeader = document.getElementById('detectionHeader');
+        const detectionBody = document.getElementById('detectionBody');
+        
+        if (detection.error) {
+            detectionCard.className = 'card border-warning';
+            detectionHeader.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>Detection Error`;
+            detectionBody.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>${detection.error}
+                </div>
+            `;
+            return;
+        }
+        
+        // Handle RAW files
+        if (detection.file_type === 'raw') {
+            detectionCard.className = 'card border-info';
+            detectionHeader.innerHTML = `<i class="fas fa-file-code me-2"></i>RAW Log File Processed`;
+            
+            const logEntry = detection.log_entry;
+            detectionBody.innerHTML = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-file-alt me-2"></i>RAW Log File Uploaded</h5>
+                    <p><strong>File Type:</strong> <span class="badge bg-info">RAW</span></p>
+                    <p><strong>Timestamp:</strong> ${logEntry.timestamp}</p>
+                    <p><strong>File Size:</strong> ${logEntry.file_size} bytes</p>
+                    <p><strong>Status:</strong> ${logEntry.status}</p>
+                    <p><strong>Detection Result:</strong> ${logEntry.detection_result}</p>
+                </div>
+                <div class="mt-3">
+                    <div class="card bg-secondary">
+                        <div class="card-body">
+                            <h6><i class="fas fa-history me-2"></i>Log History Entry Created</h6>
+                            <p class="mb-0 text-muted">RAW log file has been logged and added to the system for manual analysis and audit purposes.</p>
+                            <button class="btn btn-sm btn-outline-light mt-2" onclick="exportRawFile('${logEntry.filename}')">
+                                <i class="fas fa-download me-1"></i>Export RAW File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        if (detection.has_anomalies) {
+            // File has anomalies - show alert
+            detectionCard.className = 'card border-danger';
+            detectionHeader.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>Harmful File Detected`;
+            
+            const alert = detection.alert;
+            detectionBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5><i class="fas fa-skull-crossbones me-2"></i>Security Alert Generated</h5>
+                    <p><strong>Alert ID:</strong> ${alert.alert_id}</p>
+                    <p><strong>Severity:</strong> <span class="badge bg-${alert.severity === 'high' ? 'danger' : 'warning'}">${alert.severity.toUpperCase()}</span></p>
+                    <p><strong>Anomaly Count:</strong> ${detection.anomaly_count} out of ${detection.total_records} records (${detection.anomaly_percentage}%)</p>
+                    <p><strong>Timestamp:</strong> ${alert.timestamp}</p>
+                </div>
+                <div class="mt-3">
+                    <h6>Key Indicators:</h6>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="card bg-secondary">
+                                <div class="card-body p-2">
+                                    <small class="text-muted">ANOMALY COUNT</small>
+                                    <h5 class="mb-0 text-danger">${detection.anomaly_count}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-secondary">
+                                <div class="card-body p-2">
+                                    <small class="text-muted">ANOMALY PERCENTAGE</small>
+                                    <h5 class="mb-0 text-danger">${detection.anomaly_percentage}%</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h6>Recommendations:</h6>
+                    <ul class="list-group">
+                        ${alert.recommendations.map(rec => `
+                            <li class="list-group-item bg-dark text-light border-secondary">
+                                <i class="fas fa-exclamation-circle text-danger me-2"></i>${rec}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        } else {
+            // File is safe - show log entry
+            detectionCard.className = 'card border-success';
+            detectionHeader.innerHTML = `<i class="fas fa-check-circle me-2"></i>File Safe - Added to Log History`;
+            
+            const logEntry = detection.log_entry;
+            detectionBody.innerHTML = `
+                <div class="alert alert-success">
+                    <h5><i class="fas fa-shield-alt me-2"></i>No Threats Detected</h5>
+                    <p><strong>Status:</strong> <span class="badge bg-success">SAFE</span></p>
+                    <p><strong>Timestamp:</strong> ${logEntry.timestamp}</p>
+                    <p><strong>Records Processed:</strong> ${logEntry.records_processed}</p>
+                    <p><strong>Detection Result:</strong> ${logEntry.detection_result}</p>
+                </div>
+                <div class="mt-3">
+                    <div class="card bg-secondary">
+                        <div class="card-body">
+                            <h6><i class="fas fa-history me-2"></i>Log History Entry Created</h6>
+                            <p class="mb-0 text-muted">This file has been logged as safe and added to the system log history for audit purposes.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    // Export RAW file function
+    function exportRawFile(filename) {
+        window.location.href = `/api/export/raw/${filename}`;
+    }
+</script>
+{% endblock %}

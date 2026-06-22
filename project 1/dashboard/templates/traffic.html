@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Traffic Analytics - SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="mb-1">
+                    <i class="fas fa-chart-area me-2 text-info"></i>Traffic Analytics
+                </h2>
+                <p class="text-muted mb-0">Network flow records from connected traffic datasets</p>
+            </div>
+            <button class="btn btn-sm btn-outline-info" id="traffic-refresh-btn" onclick="loadTrafficData(true)">
+                <i class="fas fa-sync-alt me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="traffic-error" class="alert alert-danger d-none"></div>
+<div id="traffic-loading" class="alert alert-info">
+    <i class="fas fa-spinner fa-spin me-2"></i>
+    Loading traffic summary. The first load scans the large CSV files; later loads use a saved summary cache.
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="kpi-icon text-info"><i class="fas fa-database"></i></div>
+            <div class="kpi-value text-info" id="traffic-total-rows">...</div>
+            <div class="kpi-label">Flow Records</div>
+            <small class="text-muted" id="traffic-schema-status">Schema check pending</small>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="kpi-icon text-success"><i class="fas fa-shield-alt"></i></div>
+            <div class="kpi-value text-success" id="traffic-benign-rows">...</div>
+            <div class="kpi-label">Benign Flows</div>
+            <small class="text-muted">Label = Benign</small>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="kpi-icon text-danger"><i class="fas fa-bug"></i></div>
+            <div class="kpi-value text-danger" id="traffic-attack-rows">...</div>
+            <div class="kpi-label">Attack Flows</div>
+            <small class="text-muted">Non-benign labels</small>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="kpi-icon text-primary"><i class="fas fa-table-columns"></i></div>
+            <div class="kpi-value text-primary" id="traffic-column-count">...</div>
+            <div class="kpi-label">Columns</div>
+            <small class="text-muted">Traffic schema</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-xl-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-clock me-2"></i>Hourly Flow Volume
+            </div>
+            <div class="card-body">
+                <div id="trafficHourlyChart" class="chart-container traffic-chart-lg"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-tags me-2"></i>Label Distribution
+            </div>
+            <div class="card-body">
+                <div id="trafficLabelChart" class="chart-container traffic-chart-lg"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-network-wired me-2"></i>Protocol Mix
+            </div>
+            <div class="card-body">
+                <div id="trafficProtocolChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-plug me-2"></i>Top Destination Ports
+            </div>
+            <div class="card-body">
+                <div id="trafficPortsChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-ruler-combined me-2"></i>Average Flow Features
+            </div>
+            <div class="card-body">
+                <div id="trafficFeaturesChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-file-csv me-2"></i>Dataset Files
+            </div>
+            <div class="card-body">
+                <div id="trafficFilesChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-triangle-exclamation me-2 text-danger"></i>Traffic Dataset Alerts</span>
+                <span class="badge bg-danger" id="traffic-alert-count">0 Alerts</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Alert ID</th>
+                                <th>Severity</th>
+                                <th>Detected Label</th>
+                                <th>Flow Count</th>
+                                <th>Dataset Share</th>
+                                <th>Status</th>
+                                <th>Recommended Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="traffic-alert-table">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">Loading dataset alerts...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-list me-2"></i>Sample Flow Records</span>
+                <span class="badge bg-info" id="traffic-file-count">0 Files</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Label</th>
+                                <th>Protocol</th>
+                                <th>Dst Port</th>
+                                <th>Duration</th>
+                                <th>Fwd Pkts</th>
+                                <th>Bwd Pkts</th>
+                                <th>Flow Byts/s</th>
+                            </tr>
+                        </thead>
+                        <tbody id="traffic-sample-table">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">Loading traffic data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const trafficLayout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#f9fafb'},
+        margin: {l: 56, r: 24, t: 20, b: 52},
+        height: 300,
+        xaxis: {gridcolor: '#374151', color: '#9ca3af', zerolinecolor: '#374151'},
+        yaxis: {gridcolor: '#374151', color: '#9ca3af', zerolinecolor: '#374151'}
+    };
+
+    function formatNumber(value) {
+        return Number(value || 0).toLocaleString();
+    }
+
+    function showTrafficError(message) {
+        const errorBox = document.getElementById('traffic-error');
+        errorBox.textContent = message;
+        errorBox.classList.remove('d-none');
+    }
+
+    async function loadTrafficData(forceRefresh = false) {
+        const loadingBox = document.getElementById('traffic-loading');
+        const refreshButton = document.getElementById('traffic-refresh-btn');
+        try {
+            loadingBox.classList.remove('d-none');
+            refreshButton.disabled = true;
+            const response = await fetch(`/api/cicflowmeter${forceRefresh ? '?refresh=1' : ''}`);
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Unable to load traffic data');
+            }
+            document.getElementById('traffic-error').classList.add('d-none');
+            renderTrafficDashboard(data);
+        } catch (error) {
+            showTrafficError(error.message);
+        } finally {
+            loadingBox.classList.add('d-none');
+            refreshButton.disabled = false;
+        }
+    }
+
+    function renderTrafficDashboard(data) {
+        document.getElementById('traffic-total-rows').textContent = formatNumber(data.total_rows);
+        document.getElementById('traffic-benign-rows').textContent = formatNumber(data.benign_rows);
+        document.getElementById('traffic-attack-rows').textContent = formatNumber(data.attack_rows);
+        document.getElementById('traffic-column-count').textContent = formatNumber(data.total_columns);
+        document.getElementById('traffic-schema-status').textContent = data.schema_match ? 'Schemas match' : 'Schema mismatch';
+        document.getElementById('traffic-file-count').textContent = `${data.files.length} Files`;
+
+        renderLabelChart(data.label_counts);
+        renderHourlyChart(data.hourly_traffic);
+        renderProtocolChart(data.protocol_counts);
+        renderPortsChart(data.top_ports);
+        renderFeaturesChart(data.feature_means);
+        renderFilesChart(data.files);
+        renderTrafficAlerts(data.traffic_alerts);
+        renderSampleRows(data.sample_rows);
+    }
+
+    function renderLabelChart(labelCounts) {
+        const labels = Object.keys(labelCounts);
+        const values = Object.values(labelCounts);
+        Plotly.newPlot('trafficLabelChart', [{
+            labels,
+            values,
+            type: 'pie',
+            hole: 0.45,
+            marker: {colors: ['#10b981', '#ef4444', '#f59e0b', '#06b6d4', '#3b82f6']},
+            textinfo: 'label+percent',
+            textfont: {color: '#f9fafb'}
+        }], {
+            ...trafficLayout,
+            height: 340,
+            margin: {l: 12, r: 12, t: 12, b: 12},
+            showlegend: true
+        }, {responsive: true});
+    }
+
+    function renderHourlyChart(hourlyTraffic) {
+        Plotly.newPlot('trafficHourlyChart', [{
+            x: hourlyTraffic.hours,
+            y: hourlyTraffic.counts,
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: {color: '#06b6d4', width: 3},
+            marker: {size: 7, color: '#10b981'},
+            fill: 'tozeroy',
+            fillcolor: 'rgba(6, 182, 212, 0.18)',
+            name: 'Flows'
+        }], {
+            ...trafficLayout,
+            height: 340,
+            xaxis: {...trafficLayout.xaxis, title: 'Hour'},
+            yaxis: {...trafficLayout.yaxis, title: 'Flow count'}
+        }, {responsive: true});
+    }
+
+    function renderProtocolChart(protocolCounts) {
+        Plotly.newPlot('trafficProtocolChart', [{
+            x: Object.keys(protocolCounts),
+            y: Object.values(protocolCounts),
+            type: 'bar',
+            marker: {color: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']}
+        }], {
+            ...trafficLayout,
+            xaxis: {...trafficLayout.xaxis, title: 'Protocol'},
+            yaxis: {...trafficLayout.yaxis, title: 'Flows'}
+        }, {responsive: true});
+    }
+
+    function renderPortsChart(topPorts) {
+        const entries = Object.entries(topPorts).reverse();
+        Plotly.newPlot('trafficPortsChart', [{
+            x: entries.map(entry => entry[1]),
+            y: entries.map(entry => entry[0]),
+            type: 'bar',
+            orientation: 'h',
+            marker: {color: '#f59e0b'}
+        }], {
+            ...trafficLayout,
+            xaxis: {...trafficLayout.xaxis, title: 'Flows'},
+            yaxis: {...trafficLayout.yaxis, title: 'Destination port'}
+        }, {responsive: true});
+    }
+
+    function renderFeaturesChart(featureMeans) {
+        Plotly.newPlot('trafficFeaturesChart', [{
+            x: Object.keys(featureMeans),
+            y: Object.values(featureMeans),
+            type: 'bar',
+            marker: {color: '#8b5cf6'}
+        }], {
+            ...trafficLayout,
+            xaxis: {...trafficLayout.xaxis, tickangle: -30},
+            yaxis: {...trafficLayout.yaxis, title: 'Mean value', type: 'log'}
+        }, {responsive: true});
+    }
+
+    function renderFilesChart(files) {
+        Plotly.newPlot('trafficFilesChart', [{
+            x: files.map(file => file.name.replace('_TrafficForML_CICFlowMeter.csv', '')),
+            y: files.map(file => file.rows),
+            type: 'bar',
+            name: 'Rows',
+            marker: {color: '#10b981'}
+        }, {
+            x: files.map(file => file.name.replace('_TrafficForML_CICFlowMeter.csv', '')),
+            y: files.map(file => file.size_mb),
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Size MB',
+            yaxis: 'y2',
+            line: {color: '#06b6d4', width: 3}
+        }], {
+            ...trafficLayout,
+            xaxis: {...trafficLayout.xaxis, title: 'Dataset'},
+            yaxis: {...trafficLayout.yaxis, title: 'Rows'},
+            yaxis2: {
+                title: 'MB',
+                overlaying: 'y',
+                side: 'right',
+                gridcolor: 'rgba(0,0,0,0)',
+                color: '#9ca3af'
+            },
+            legend: {orientation: 'h'}
+        }, {responsive: true});
+    }
+
+    function renderSampleRows(rows) {
+        const tableBody = document.getElementById('traffic-sample-table');
+        if (!rows || rows.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No sample rows available</td></tr>';
+            return;
+        }
+
+        tableBody.innerHTML = rows.map(row => `
+            <tr>
+                <td>${row.Timestamp || ''}</td>
+                <td><span class="badge ${row.Label === 'Benign' ? 'bg-success' : 'bg-danger'}">${row.Label || ''}</span></td>
+                <td>${row.Protocol || ''}</td>
+                <td>${row['Dst Port'] || ''}</td>
+                <td>${formatNumber(row['Flow Duration'])}</td>
+                <td>${formatNumber(row['Tot Fwd Pkts'])}</td>
+                <td>${formatNumber(row['Tot Bwd Pkts'])}</td>
+                <td>${formatNumber(row['Flow Byts/s'])}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderTrafficAlerts(alerts) {
+        const tableBody = document.getElementById('traffic-alert-table');
+        const countBadge = document.getElementById('traffic-alert-count');
+        const severityClasses = {
+            critical: 'bg-danger',
+            high: 'bg-warning',
+            medium: 'bg-info',
+            low: 'bg-primary'
+        };
+
+        if (!alerts || alerts.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No attack labels detected</td></tr>';
+            countBadge.textContent = '0 Alerts';
+            return;
+        }
+
+        countBadge.textContent = `${alerts.length} Alerts`;
+        tableBody.innerHTML = alerts.map(alert => `
+            <tr>
+                <td><code>${alert.alert_id}</code></td>
+                <td><span class="badge ${severityClasses[alert.severity] || 'bg-secondary'}">${alert.severity.toUpperCase()}</span></td>
+                <td>${alert.label}</td>
+                <td>${formatNumber(alert.flow_count)}</td>
+                <td>${alert.percentage}%</td>
+                <td><span class="badge bg-secondary">${alert.status.toUpperCase()}</span></td>
+                <td>${alert.recommendation}</td>
+            </tr>
+        `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => loadTrafficData(false));
+</script>
+{% endblock %}

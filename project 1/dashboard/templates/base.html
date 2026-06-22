@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SIEM Dashboard{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <!-- Plotly.js (LOCAL - no internet required) -->
+    <script src="{{ url_for('static', filename='js/plotly.min.js') }}"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    
+    <style>
+        /* Modern SIEM Dashboard Styling */
+        :root {
+            --siem-bg-primary: #0a0e17;
+            --siem-bg-secondary: #111827;
+            --siem-bg-tertiary: #1f2937;
+            --siem-accent-primary: #3b82f6;
+            --siem-accent-secondary: #10b981;
+            --siem-accent-danger: #ef4444;
+            --siem-accent-warning: #f59e0b;
+            --siem-accent-info: #06b6d4;
+            --siem-text-primary: #f9fafb;
+            --siem-text-secondary: #9ca3af;
+            --siem-border-color: #374151;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--siem-bg-primary) 0%, var(--siem-bg-secondary) 100%);
+            color: var(--siem-text-primary);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(17, 24, 39, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--siem-border-color) !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--siem-accent-primary), var(--siem-accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .nav-link {
+            color: var(--siem-text-secondary) !important;
+            font-weight: 500;
+            padding: 0.75rem 1rem !important;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+            margin: 0 0.25rem;
+        }
+        
+        .nav-link:hover {
+            color: var(--siem-text-primary) !important;
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .nav-link.active {
+            color: var(--siem-text-primary) !important;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(16, 185, 129, 0.2));
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .card {
+            background: var(--siem-bg-secondary);
+            border: 1px solid var(--siem-border-color);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+        
+        .card-header {
+            background: rgba(31, 41, 55, 0.5);
+            border-bottom: 1px solid var(--siem-border-color);
+            font-weight: 600;
+            color: var(--siem-text-primary);
+        }
+        
+        .btn-outline-light {
+            border-color: var(--siem-border-color);
+            color: var(--siem-text-secondary);
+        }
+        
+        .btn-outline-light:hover {
+            background: var(--siem-accent-primary);
+            border-color: var(--siem-accent-primary);
+            color: white;
+        }
+        
+        .badge {
+            font-weight: 600;
+            padding: 0.5rem 0.75rem;
+        }
+        
+        /* KPI Cards */
+        .kpi-card {
+            background: linear-gradient(135deg, var(--siem-bg-secondary), var(--siem-bg-tertiary));
+            border: 1px solid var(--siem-border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--siem-accent-primary), var(--siem-accent-secondary));
+        }
+        
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .kpi-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.8;
+        }
+        
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+        
+        .kpi-label {
+            font-size: 0.875rem;
+            color: var(--siem-text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        /* Severity Colors */
+        .severity-critical { color: #ef4444; }
+        .severity-high { color: #f59e0b; }
+        .severity-medium { color: #eab308; }
+        .severity-low { color: #3b82f6; }
+        
+        .border-critical { border-color: #ef4444 !important; }
+        .border-high { border-color: #f59e0b !important; }
+        .border-medium { border-color: #eab308 !important; }
+        .border-low { border-color: #3b82f6 !important; }
+        
+        .bg-critical { background-color: rgba(239, 68, 68, 0.1); }
+        .bg-high { background-color: rgba(245, 158, 11, 0.1); }
+        .bg-medium { background-color: rgba(234, 179, 8, 0.1); }
+        .bg-low { background-color: rgba(59, 130, 246, 0.1); }
+        
+        /* Table Styling */
+        .table-dark {
+            background-color: var(--siem-bg-secondary);
+            color: var(--siem-text-primary);
+        }
+        
+        .table-dark th {
+            background-color: var(--siem-bg-tertiary);
+            border-color: var(--siem-border-color);
+        }
+        
+        .table-dark td {
+            border-color: var(--siem-border-color);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--siem-bg-secondary);
+            border-top: 1px solid var(--siem-border-color);
+        }
+        
+        /* Chart Containers */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--siem-bg-primary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--siem-border-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--siem-accent-primary);
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-shield-alt me-2"></i>
+                <span class="fw-bold">SIEM Dashboard</span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="/">
+                            <i class="fas fa-home me-1"></i>Overview
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'alerts' %}active{% endif %}" href="/alerts">
+                            <i class="fas fa-exclamation-triangle me-1"></i>Alerts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'outliers' %}active{% endif %}" href="/outliers">
+                            <i class="fas fa-chart-scatter me-1"></i>Outliers
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'monitor' %}active{% endif %}" href="/monitor">
+                            <i class="fas fa-desktop me-1"></i>Monitor
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'traffic' %}active{% endif %}" href="/traffic">
+                            <i class="fas fa-chart-area me-1"></i>Traffic
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'search' %}active{% endif %}" href="/search">
+                            <i class="fas fa-search me-1"></i>Search
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'test_upload' %}active{% endif %}" href="/test-upload">
+                            <i class="fas fa-upload me-1"></i>Test Upload
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'model_evaluation' %}active{% endif %}" href="/model-evaluation">
+                            <i class="fas fa-chart-pie me-1"></i>Model Evaluation
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-sm btn-outline-light me-3" onclick="exportLogs()">
+                        <i class="fas fa-download me-1"></i>Export Logs
+                    </button>
+                    <span class="badge bg-success me-3 pulse-animation" id="live-indicator">
+                        <i class="fas fa-circle fa-xs me-1"></i>Live
+                    </span>
+                    <span class="text-muted small" id="last-updated">
+                        <i class="fas fa-clock me-1"></i>Just now
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container-fluid py-3">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-dark border-top border-secondary">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-6">
+                    <span class="text-muted small">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        SIEM Dashboard - Network Traffic Anomaly Detection
+                    </span>
+                </div>
+                <div class="col-md-6 text-end">
+                    <span class="text-muted small">
+                        Powered by One-Class SVM | 
+                        <a href="https://github.com" class="text-decoration-none text-muted">
+                            <i class="fab fa-github"></i> GitHub
+                        </a>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery (required for DataTables) -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <script>
+        // Export logs function
+        function exportLogs() {
+            window.location.href = '/api/export/logs';
+        }
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Real-Time Monitor - SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2 class="mb-0">
+            <i class="fas fa-desktop me-2"></i>Real-Time Security Monitor
+        </h2>
+        <p class="text-muted mb-0">Live stream from the SIEM alert history file</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-header bg-success">
+                <i class="fas fa-heartbeat me-2"></i>Stream Status
+            </div>
+            <div class="card-body">
+                <h2 class="text-success mb-0" id="streamStatus">
+                    <i class="fas fa-circle"></i> LIVE
+                </h2>
+                <p class="text-muted mb-0" id="streamTimestamp">Connecting...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-header bg-info">
+                <i class="fas fa-clock me-2"></i>Session Uptime
+            </div>
+            <div class="card-body">
+                <h2 class="text-info mb-0" id="uptime">00:00:00</h2>
+                <p class="text-muted mb-0">Current browser session</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-header bg-warning">
+                <i class="fas fa-bell me-2"></i>Total Alerts
+            </div>
+            <div class="card-body">
+                <h2 class="text-warning mb-0" id="totalAlertsCount">0</h2>
+                <p class="text-muted mb-0">Loaded from SIEM history</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-header bg-danger">
+                <i class="fas fa-bolt me-2"></i>New This Session
+            </div>
+            <div class="card-body">
+                <h2 class="text-danger mb-0" id="sessionNewCount">0</h2>
+                <p class="text-muted mb-0">Pushed by live stream</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-stream me-2"></i>Live Alert Feed</span>
+                <div>
+                    <span class="badge bg-success" id="streamBadge">
+                        <i class="fas fa-circle fa-xs me-1" id="liveIndicator"></i>Connected
+                    </span>
+                    <button class="btn btn-sm btn-outline-light ms-2" onclick="clearFeed()">
+                        <i class="fas fa-trash me-1"></i>Clear
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="live-feed" id="liveFeed">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-sync fa-spin fa-2x mb-3"></i>
+                        <p>Connecting to live alert stream...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-line me-2"></i>Live Alert Rate
+            </div>
+            <div class="card-body">
+                <div id="alertRateChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-tachometer-alt me-2"></i>High Severity Share
+            </div>
+            <div class="card-body">
+                <div id="severityGauge"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let startTime = Date.now();
+    let eventSource = null;
+    let sessionNewAlerts = 0;
+    const liveEventTimes = [];
+    const alertRateData = { x: [], y: [] };
+
+    function formatNumber(value) {
+        return Number(value || 0).toLocaleString();
+    }
+
+    function parseAlertTime(timestamp) {
+        if (!timestamp) return new Date();
+        return new Date(String(timestamp).replace(' ', 'T'));
+    }
+
+    function updateUptime() {
+        const elapsed = Date.now() - startTime;
+        const hours = Math.floor(elapsed / 3600000);
+        const minutes = Math.floor((elapsed % 3600000) / 60000);
+        const seconds = Math.floor((elapsed % 60000) / 1000);
+        document.getElementById('uptime').textContent =
+            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    setInterval(updateUptime, 1000);
+
+    const transparentLayout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#e0e0e0'},
+        margin: {l: 50, r: 20, t: 20, b: 50}
+    };
+
+    Plotly.newPlot('alertRateChart', [{
+        x: [],
+        y: [],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#00bfa5', width: 2},
+        marker: {color: '#06b6d4', size: 6},
+        fill: 'tozeroy',
+        fillcolor: 'rgba(0, 191, 165, 0.2)'
+    }], {
+        ...transparentLayout,
+        xaxis: {title: 'Time', gridcolor: '#3a3a3a'},
+        yaxis: {title: 'New alerts/min', gridcolor: '#3a3a3a', rangemode: 'tozero'},
+        height: 250
+    }, {responsive: true});
+
+    Plotly.newPlot('severityGauge', [{
+        type: 'indicator',
+        mode: 'gauge+number',
+        value: 0,
+        title: {text: 'High + Critical %', font: {color: '#e0e0e0'}},
+        gauge: {
+            axis: {range: [0, 100], tickcolor: '#e0e0e0'},
+            bar: {color: '#dc3545'},
+            bgcolor: '#2d2d2d',
+            borderwidth: 2,
+            bordercolor: '#3a3a3a',
+            steps: [
+                {range: [0, 33], color: '#28a745'},
+                {range: [33, 66], color: '#ffc107'},
+                {range: [66, 100], color: '#dc3545'}
+            ]
+        }
+    }], {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#e0e0e0'},
+        height: 250,
+        margin: {l: 20, r: 20, t: 20, b: 20}
+    }, {responsive: true});
+
+    function setStreamStatus(connected, timestamp = null) {
+        const status = document.getElementById('streamStatus');
+        const badge = document.getElementById('streamBadge');
+        const stamp = document.getElementById('streamTimestamp');
+        if (connected) {
+            status.className = 'text-success mb-0';
+            status.innerHTML = '<i class="fas fa-circle"></i> LIVE';
+            badge.className = 'badge bg-success';
+            badge.innerHTML = '<i class="fas fa-circle fa-xs me-1" id="liveIndicator"></i>Connected';
+            stamp.textContent = timestamp ? `Last update: ${timestamp}` : 'Connected';
+        } else {
+            status.className = 'text-danger mb-0';
+            status.innerHTML = '<i class="fas fa-circle"></i> OFFLINE';
+            badge.className = 'badge bg-danger';
+            badge.innerHTML = '<i class="fas fa-circle fa-xs me-1"></i>Disconnected';
+            stamp.textContent = 'Waiting to reconnect';
+        }
+    }
+
+    function renderAlertItem(alert, prepend = true, isNew = false) {
+        const feed = document.getElementById('liveFeed');
+        if (feed.querySelector('.text-center')) {
+            feed.innerHTML = '';
+        }
+        if (alert.alert_id && document.querySelector(`[data-alert-id="${alert.alert_id}"]`)) {
+            return;
+        }
+
+        const severity = alert.severity || 'low';
+        const timestamp = parseAlertTime(alert.timestamp).toLocaleTimeString();
+        const anomalyScore = Number(alert.anomaly_score || 0).toFixed(2);
+        const item = document.createElement('div');
+        item.className = `live-feed-item severity-${severity}`;
+        item.setAttribute('data-alert-id', alert.alert_id || `${Date.now()}-${Math.random()}`);
+        item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge severity-${severity} me-2">${severity.toUpperCase()}</span>
+                        ${isNew ? '<span class="badge bg-danger me-2">NEW</span>' : ''}
+                        <span class="text-muted small">${timestamp}</span>
+                    </div>
+                    <h6 class="mb-1">${alert.filename || alert.alert_id || 'Security alert'}</h6>
+                    <p class="mb-1 small">Anomaly Score: <strong>${anomalyScore}</strong></p>
+                    <p class="mb-0 small text-muted">${alert.source || 'SIEM alert stream'}</p>
+                </div>
+                <button class="btn btn-sm btn-outline-light" onclick="viewAlertDetails('${alert.alert_id || ''}')">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+        `;
+
+        if (prepend) {
+            feed.insertBefore(item, feed.firstChild);
+        } else {
+            feed.appendChild(item);
+        }
+
+        while (feed.children.length > 20) {
+            feed.removeChild(feed.lastChild);
+        }
+    }
+
+    function renderFeed(alerts) {
+        const feed = document.getElementById('liveFeed');
+        feed.innerHTML = '';
+        if (!alerts || alerts.length === 0) {
+            feed.innerHTML = '<div class="text-center text-muted py-4"><p>No alerts found yet.</p></div>';
+            return;
+        }
+        alerts.slice(0, 10).forEach(alert => renderAlertItem(alert, false, false));
+    }
+
+    function updateRateChart(newAlertCount) {
+        const now = Date.now();
+        for (let i = 0; i < newAlertCount; i++) {
+            liveEventTimes.push(now);
+        }
+        const oneMinuteAgo = now - 60000;
+        while (liveEventTimes.length && liveEventTimes[0] < oneMinuteAgo) {
+            liveEventTimes.shift();
+        }
+
+        alertRateData.x.push(new Date().toLocaleTimeString());
+        alertRateData.y.push(liveEventTimes.length);
+        if (alertRateData.x.length > 30) {
+            alertRateData.x.shift();
+            alertRateData.y.shift();
+        }
+        Plotly.update('alertRateChart', {x: [alertRateData.x], y: [alertRateData.y]});
+    }
+
+    function applyMonitorUpdate(data) {
+        document.getElementById('totalAlertsCount').textContent = formatNumber(data.total_alerts);
+        Plotly.update('severityGauge', {value: [data.high_severity_percent || 0]});
+        setStreamStatus(true, data.timestamp);
+
+        if (data.recent_alerts && !document.querySelector('#liveFeed .live-feed-item')) {
+            renderFeed(data.recent_alerts);
+        }
+
+        const newAlerts = data.new_alerts || [];
+        if (newAlerts.length > 0) {
+            sessionNewAlerts += newAlerts.length;
+            document.getElementById('sessionNewCount').textContent = formatNumber(sessionNewAlerts);
+            newAlerts.slice().reverse().forEach(alert => renderAlertItem(alert, true, true));
+        }
+        updateRateChart(newAlerts.length);
+    }
+
+    function connectLiveStream() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        eventSource = new EventSource('/api/stream');
+
+        eventSource.onopen = () => setStreamStatus(true, 'Connected');
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'monitor_update') {
+                applyMonitorUpdate(data);
+            } else if (data.type === 'heartbeat') {
+                setStreamStatus(true, data.timestamp);
+                updateRateChart(0);
+            } else if (data.error) {
+                console.error('Stream error:', data.error);
+            }
+        };
+        eventSource.onerror = () => {
+            setStreamStatus(false);
+        };
+    }
+
+    function clearFeed() {
+        document.getElementById('liveFeed').innerHTML =
+            '<div class="text-center text-muted py-4"><p>Feed cleared. Waiting for live alerts...</p></div>';
+    }
+
+    function viewAlertDetails(alertId) {
+        if (alertId) {
+            window.location.href = '/alerts?search=' + encodeURIComponent(alertId);
+        }
+    }
+
+    setInterval(() => {
+        const indicator = document.getElementById('liveIndicator');
+        if (indicator) {
+            indicator.style.opacity = indicator.style.opacity === '0.3' ? '1' : '0.3';
+        }
+    }, 1000);
+
+    window.addEventListener('beforeunload', () => {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+
+    connectLiveStream();
+</script>
+{% endblock %}

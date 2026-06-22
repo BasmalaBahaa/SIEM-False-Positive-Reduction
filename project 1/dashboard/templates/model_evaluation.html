@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}Model Evaluation - SIEM Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2 class="mb-0">
+            <i class="fas fa-chart-pie me-2"></i>Model Evaluation
+        </h2>
+        <p class="text-muted">Real-time Confusion Matrix and False Positive Rate Analysis</p>
+    </div>
+</div>
+
+<!-- Loading Indicator -->
+<div id="loadingIndicator" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-2">Loading model evaluation data...</p>
+</div>
+
+<!-- Error Indicator -->
+<div id="errorIndicator" class="alert alert-danger" style="display: none;">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <span id="errorMessage">Failed to load evaluation data</span>
+</div>
+
+<!-- Evaluation Content (Hidden until loaded) -->
+<div id="evaluationContent" style="display: none;">
+    <!-- Confusion Matrix Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-th me-2"></i>Confusion Matrix Comparison
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="text-center mb-3">Traditional SIEM (Rule-Based)</h5>
+                            <table class="table table-bordered table-dark text-center">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Predicted Attack</th>
+                                        <th>Predicted Normal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th class="table-active">Actual Attack</th>
+                                        <td class="table-success">
+                                            <div class="metric-value" id="tradTpValue">-</div>
+                                            <div class="metric-label">True Positive (TP)</div>
+                                        </td>
+                                        <td class="table-danger">
+                                            <div class="metric-value" id="tradFnValue">-</div>
+                                            <div class="metric-label">False Negative (FN)</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="table-active">Actual Normal</th>
+                                        <td class="table-warning">
+                                            <div class="metric-value" id="tradFpValue">-</div>
+                                            <div class="metric-label">False Positive (FP)</div>
+                                        </td>
+                                        <td class="table-success">
+                                            <div class="metric-value" id="tradTnValue">-</div>
+                                            <div class="metric-label">True Negative (TN)</div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="text-center mb-3">ML-Enhanced SIEM</h5>
+                            <table class="table table-bordered table-dark text-center">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Predicted Attack</th>
+                                        <th>Predicted Normal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th class="table-active">Actual Attack</th>
+                                        <td class="table-success">
+                                            <div class="metric-value" id="mlTpValue">-</div>
+                                            <div class="metric-label">True Positive (TP)</div>
+                                        </td>
+                                        <td class="table-danger">
+                                            <div class="metric-value" id="mlFnValue">-</div>
+                                            <div class="metric-label">False Negative (FN)</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="table-active">Actual Normal</th>
+                                        <td class="table-warning">
+                                            <div class="metric-value" id="mlFpValue">-</div>
+                                            <div class="metric-label">False Positive (FP)</div>
+                                        </td>
+                                        <td class="table-success">
+                                            <div class="metric-value" id="mlTnValue">-</div>
+                                            <div class="metric-label">True Negative (TN)</div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h5>Confusion Matrix Legend</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item bg-dark text-light border-success">
+                                    <strong>True Positive (TP):</strong> Correctly identified attacks
+                                </li>
+                                <li class="list-group-item bg-dark text-light border-success">
+                                    <strong>True Negative (TN):</strong> Correctly identified normal events
+                                </li>
+                                <li class="list-group-item bg-dark text-light border-warning">
+                                    <strong>False Positive (FP):</strong> Normal events incorrectly flagged as attacks
+                                </li>
+                                <li class="list-group-item bg-dark text-light border-danger">
+                                    <strong>False Negative (FN):</strong> Attacks missed by the system
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-calculator me-2"></i>Key Metrics Comparison
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="text-center mb-3">Traditional SIEM (Rule-Based)</h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-warning">
+                                        <div class="kpi-icon text-warning">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </div>
+                                        <div class="kpi-value text-warning" id="tradFprValue">-</div>
+                                        <div class="kpi-label">FPR</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-danger">
+                                        <div class="kpi-icon text-danger">
+                                            <i class="fas fa-times-circle"></i>
+                                        </div>
+                                        <div class="kpi-value text-danger" id="tradFnrValue">-</div>
+                                        <div class="kpi-label">FNR</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-info">
+                                        <div class="kpi-icon text-info">
+                                            <i class="fas fa-bullseye"></i>
+                                        </div>
+                                        <div class="kpi-value text-info" id="tradPrecisionValue">-</div>
+                                        <div class="kpi-label">Precision</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-success">
+                                        <div class="kpi-icon text-success">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                        <div class="kpi-value text-success" id="tradRecallValue">-</div>
+                                        <div class="kpi-label">Recall</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="text-center mb-3">ML-Enhanced SIEM</h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-success">
+                                        <div class="kpi-icon text-success">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </div>
+                                        <div class="kpi-value text-success" id="mlFprValue">-</div>
+                                        <div class="kpi-label">FPR</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-info">
+                                        <div class="kpi-icon text-info">
+                                            <i class="fas fa-times-circle"></i>
+                                        </div>
+                                        <div class="kpi-value text-info" id="mlFnrValue">-</div>
+                                        <div class="kpi-label">FNR</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-primary">
+                                        <div class="kpi-icon text-primary">
+                                            <i class="fas fa-bullseye"></i>
+                                        </div>
+                                        <div class="kpi-value text-primary" id="mlPrecisionValue">-</div>
+                                        <div class="kpi-label">Precision</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card kpi-card border-success">
+                                        <div class="kpi-icon text-success">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                        <div class="kpi-value text-success" id="mlRecallValue">-</div>
+                                        <div class="kpi-label">Recall</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparison Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-balance-scale me-2"></i>Traditional SIEM vs ML-Enhanced SIEM
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Traditional SIEM (Rule-Based)</h5>
+                            <table class="table table-dark">
+                                <tr>
+                                    <td>Total Alerts</td>
+                                    <td class="text-warning" id="tradTotalAlerts">-</td>
+                                </tr>
+                                <tr>
+                                    <td>True Positives (TP)</td>
+                                    <td class="text-success" id="tradTp">-</td>
+                                </tr>
+                                <tr>
+                                    <td>False Positives (FP)</td>
+                                    <td class="text-danger" id="tradFp">-</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>ML-Enhanced SIEM</h5>
+                            <table class="table table-dark">
+                                <tr>
+                                    <td>Total Alerts</td>
+                                    <td class="text-success" id="mlTotalAlerts">-</td>
+                                </tr>
+                                <tr>
+                                    <td>True Positives (TP)</td>
+                                    <td class="text-success" id="mlTp">-</td>
+                                </tr>
+                                <tr>
+                                    <td>False Positives (FP)</td>
+                                    <td class="text-success" id="mlFp">-</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-success">
+                                <h5><i class="fas fa-chart-line me-2"></i>False Positive Reduction</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Calculation:</strong></p>
+                                        <p class="math-display">
+                                            Reduction = (FP_traditional - FP_ml) / FP_traditional × 100
+                                        </p>
+                                        <p class="math-display">
+                                            Reduction = (<span id="calcFpOld">-</span> - <span id="calcFpNew">-</span>) / <span id="calcFpOld2">-</span> × 100
+                                        </p>
+                                        <p class="math-display">
+                                            Reduction = <strong><span id="fpReductionCalc">-</span>%</strong>
+                                        </p>
+                                    </div>
+                                    <div class="col-md-6 text-center">
+                                        <h1 class="display-1 text-success" id="fpReductionDisplay">-</h1>
+                                        <p class="lead">Reduction in False Positives</p>
+                                        <p class="text-muted">The ML model reduced false alerts by <span id="fpReductionText">-</span>%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulas Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-book me-2"></i>Metric Formulas
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>False Positive Rate (FPR)</h5>
+                            <p class="math-display">FPR = FP / (FP + TN)</p>
+                            <p class="text-muted">Out of all normal events, how many were incorrectly flagged as attacks?</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>False Negative Rate (FNR)</h5>
+                            <p class="math-display">FNR = FN / (FN + TP)</p>
+                            <p class="text-muted">Out of all actual attacks, how many were missed?</p>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h5>Precision</h5>
+                            <p class="math-display">Precision = TP / (TP + FP)</p>
+                            <p class="text-muted">Of all predicted attacks, how many were actual attacks?</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Recall (Detection Rate)</h5>
+                            <p class="math-display">Recall = TP / (TP + FN)</p>
+                            <p class="text-muted">Of all actual attacks, how many were detected?</p>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h5>Accuracy</h5>
+                            <p class="math-display">Accuracy = (TP + TN) / (TP + TN + FP + FN)</p>
+                            <p class="text-muted">Overall correctness of the model</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>False Positive Reduction</h5>
+                            <p class="math-display">Reduction = (FP_old - FP_new) / FP_old × 100</p>
+                            <p class="text-muted">Improvement in reducing false alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .metric-label {
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+    .math-display {
+        font-family: 'Courier New', monospace;
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 0.5rem;
+        border-radius: 4px;
+        margin: 0.5rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Load real evaluation data from API
+    fetch('/api/model-evaluation')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            if (data.error) {
+                document.getElementById('errorIndicator').style.display = 'block';
+                document.getElementById('errorMessage').textContent = data.error;
+                return;
+            }
+            
+            document.getElementById('evaluationContent').style.display = 'block';
+            
+            // Update traditional SIEM confusion matrix
+            document.getElementById('tradTpValue').textContent = data.confusion_matrix.traditional_siem.true_positive;
+            document.getElementById('tradFpValue').textContent = data.confusion_matrix.traditional_siem.false_positive;
+            document.getElementById('tradTnValue').textContent = data.confusion_matrix.traditional_siem.true_negative;
+            document.getElementById('tradFnValue').textContent = data.confusion_matrix.traditional_siem.false_negative;
+            
+            // Update ML-enhanced confusion matrix
+            document.getElementById('mlTpValue').textContent = data.confusion_matrix.ml_enhanced.true_positive;
+            document.getElementById('mlFpValue').textContent = data.confusion_matrix.ml_enhanced.false_positive;
+            document.getElementById('mlTnValue').textContent = data.confusion_matrix.ml_enhanced.true_negative;
+            document.getElementById('mlFnValue').textContent = data.confusion_matrix.ml_enhanced.false_negative;
+            
+            // Update traditional SIEM metrics
+            document.getElementById('tradFprValue').textContent = data.metrics.traditional_siem.false_positive_rate + '%';
+            document.getElementById('tradFnrValue').textContent = data.metrics.traditional_siem.false_negative_rate + '%';
+            document.getElementById('tradPrecisionValue').textContent = data.metrics.traditional_siem.precision + '%';
+            document.getElementById('tradRecallValue').textContent = data.metrics.traditional_siem.recall + '%';
+            
+            // Update ML-enhanced metrics
+            document.getElementById('mlFprValue').textContent = data.metrics.ml_enhanced.false_positive_rate + '%';
+            document.getElementById('mlFnrValue').textContent = data.metrics.ml_enhanced.false_negative_rate + '%';
+            document.getElementById('mlPrecisionValue').textContent = data.metrics.ml_enhanced.precision + '%';
+            document.getElementById('mlRecallValue').textContent = data.metrics.ml_enhanced.recall + '%';
+            
+            // Update comparison
+            document.getElementById('tradTotalAlerts').textContent = data.comparison.traditional_siem.total_alerts;
+            document.getElementById('tradTp').textContent = data.comparison.traditional_siem.true_positives;
+            document.getElementById('tradFp').textContent = data.comparison.traditional_siem.false_positives;
+            document.getElementById('mlTotalAlerts').textContent = data.comparison.ml_enhanced.total_alerts;
+            document.getElementById('mlTp').textContent = data.comparison.ml_enhanced.true_positives;
+            document.getElementById('mlFp').textContent = data.comparison.ml_enhanced.false_positives;
+            
+            // Update reduction calculation
+            document.getElementById('calcFpOld').textContent = data.comparison.traditional_siem.false_positives;
+            document.getElementById('calcFpNew').textContent = data.comparison.ml_enhanced.false_positives;
+            document.getElementById('calcFpOld2').textContent = data.comparison.traditional_siem.false_positives;
+            document.getElementById('fpReductionCalc').textContent = data.comparison.fp_reduction;
+            document.getElementById('fpReductionDisplay').textContent = data.comparison.fp_reduction + '%';
+            document.getElementById('fpReductionText').textContent = data.comparison.fp_reduction;
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            document.getElementById('errorIndicator').style.display = 'block';
+            document.getElementById('errorMessage').textContent = 'Error loading evaluation data: ' + error.message;
+        });
+</script>
+{% endblock %}
